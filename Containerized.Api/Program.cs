@@ -1,33 +1,48 @@
 using Containerized.Api.Persistance;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Add database connection to the container.
-builder.Services.AddDbContext<ApplicationDbContext>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-);
-
-// Add services to the container.
-builder.Services.AddControllers();
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
+using var scope = app.Services.CreateScope();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+Configure(app, db);
+
+static void ConfigureServices(IServiceCollection services, IConfiguration config)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // Add database connection to the container.
+    services.AddDbContext<ApplicationDbContext>(opt =>
+        opt.UseNpgsql(config.GetConnectionString("DefaultConnection")
+    ));
+
+    // Add services to the container.
+    services.AddControllers();
+
+    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+    services.AddEndpointsApiExplorer();
+    services.AddSwaggerGen();
 }
 
-app.UseHttpsRedirection();
+static void Configure(WebApplication app, ApplicationDbContext db)
+{
+    db.Database.Migrate();
 
-app.UseAuthorization();
 
-app.MapControllers();
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
 
-app.Run();
+    app.UseHttpsRedirection();
+
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.Run();
+}
